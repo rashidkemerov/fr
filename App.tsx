@@ -53,7 +53,7 @@ const AppContent = () => {
   };
 
   const themeStyles = {
-    backgroundColor: theme === 'dark' ? '#3b445b' : '#fffdeb',
+    backgroundColor: theme === 'dark' ? '#3b445b' : '#ffffff',
     color: theme === 'dark' ? '#f8fafc' : '#0F172A',
     minHeight: '100vh',
     transition: 'background-color 0.3s, color 0.3s'
