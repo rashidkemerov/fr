@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { StoreProvider, useStore } from './store/StoreContext';
@@ -7,12 +8,18 @@ const Catalog = lazy(() => import('./pages/Catalog'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const Cart = lazy(() => import('./pages/Cart'));
 const History = lazy(() => import('./pages/History'));
-// Updated import path for AdminPanel in the Admin folder
 const AdminPanel = lazy(() => import('./pages/Admin/AdminPanel'));
 
 const LoadingScreen = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-    <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-orange-500"></div>
+    <div className="space-y-4 w-full px-8 max-w-sm">
+      <div className="h-4 bg-slate-200 rounded animate-pulse w-3/4 mx-auto"></div>
+      <div className="h-64 bg-slate-200 rounded-3xl animate-pulse"></div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="h-32 bg-slate-200 rounded-2xl animate-pulse"></div>
+        <div className="h-32 bg-slate-200 rounded-2xl animate-pulse"></div>
+      </div>
+    </div>
   </div>
 );
 
@@ -37,8 +44,23 @@ const ToastContainer = () => {
 }
 
 const AppContent = () => {
+  const { theme, fontSize } = useStore();
+
+  const getFontSizeClass = () => {
+    if (fontSize === 'small') return 'text-sm';
+    if (fontSize === 'large') return 'text-lg';
+    return 'text-base';
+  };
+
+  const themeStyles = {
+    backgroundColor: theme === 'dark' ? '#3b445b' : '#fffdeb',
+    color: theme === 'dark' ? '#f8fafc' : '#0F172A',
+    minHeight: '100vh',
+    transition: 'background-color 0.3s, color 0.3s'
+  };
+
   return (
-    <>
+    <div style={themeStyles} className={getFontSizeClass()}>
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/" element={<Catalog />} />
@@ -51,7 +73,7 @@ const AppContent = () => {
         </Routes>
       </Suspense>
       <ToastContainer />
-    </>
+    </div>
   );
 };
 

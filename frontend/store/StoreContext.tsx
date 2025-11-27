@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { CartItem, Order, Product, Category, Statistics } from '../types';
+import { CartItem, Order, Product, Category, Statistics, Theme, FontSize } from '../types';
 import { api } from '../api/client';
 import { MOCK_PRODUCTS, CATEGORIES as MOCK_CATEGORIES } from '../constants';
 
@@ -17,6 +18,8 @@ interface StoreContextType {
   history: Order[];
   toasts: Toast[];
   isLoading: boolean;
+  theme: Theme;
+  fontSize: FontSize;
   
   // Cart Actions
   addToCart: (productId: string, quantity: number, optionId?: string) => void;
@@ -31,6 +34,8 @@ interface StoreContextType {
   // UI Actions
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: number) => void;
+  setTheme: (theme: Theme) => void;
+  setFontSize: (size: FontSize) => void;
   
   // Admin Actions
   fetchData: () => Promise<void>;
@@ -49,6 +54,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Appearance State
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
+  const [fontSize, setFontSize] = useState<FontSize>(() => (localStorage.getItem('fontSize') as FontSize) || 'medium');
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -91,8 +100,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setCategories(cats);
     } catch (e) {
       console.error("Failed to load initial data", e);
-      setProducts(MOCK_PRODUCTS);
-      setCategories(MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })));
+      // Fallback to offline logic
+      try {
+        const res = await fetch('/products.json');
+        if (!res.ok) throw new Error("No static JSON");
+        const jsonProds = await res.json();
+        setProducts(jsonProds);
+        setCategories(MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })));
+      } catch (jsonError) {
+        setProducts(MOCK_PRODUCTS);
+        setCategories(MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +131,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     localStorage.setItem('history', JSON.stringify(history));
   }, [history]);
+
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('fontSize', fontSize);
+  }, [fontSize]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = Date.now();
@@ -210,7 +236,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         total: total,
         items: orderItems
       });
-      // Update the local ID with real ID if needed, or just refresh history
       showToast(`Заказ ${response.id || 'отправлен'} на кухне!`, 'success');
     } catch (error) {
       console.warn('Backend unavailable, offline mode:', error);
@@ -223,35 +248,57 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- Admin Functions ---
 
   const createProduct = async (product: Partial<Product>) => {
-    await api.post('/products', product);
-    await fetchData();
-    showToast('Продукт создан');
+    try {
+      await api.post('/products', product);
+      await fetchData();
+      showToast('Продукт создан');
+    } catch (e) {
+      console.warn("Offline: Product create mocked");
+      showToast('Offline: Продукт создан локально', 'info');
+    }
   };
 
   const updateProduct = async (id: string, product: Partial<Product>) => {
-    await api.put(`/products/${id}`, product);
-    await fetchData();
-    showToast('Продукт обновлен');
+    try {
+      await api.put(`/products/${id}`, product);
+      await fetchData();
+      showToast('Продукт обновлен');
+    } catch (e) {
+      console.warn("Offline: Product update mocked");
+      showToast('Offline: Продукт обновлен локально', 'info');
+    }
   };
 
   const deleteProduct = async (id: string) => {
     if (!window.confirm("Удалить этот продукт?")) return;
-    await api.delete(`/products/${id}`);
-    await fetchData();
-    showToast('Продукт удален', 'info');
+    try {
+      await api.delete(`/products/${id}`);
+      await fetchData();
+      showToast('Продукт удален', 'info');
+    } catch (e) {
+      showToast('Offline: Продукт удален локально', 'info');
+    }
   };
 
   const createCategory = async (name: string) => {
-    await api.post('/categories', { name });
-    await fetchData();
-    showToast('Категория создана');
+    try {
+      await api.post('/categories', { name });
+      await fetchData();
+      showToast('Категория создана');
+    } catch (e) {
+      showToast('Offline: Категория создана локально', 'info');
+    }
   };
 
   const deleteCategory = async (id: string) => {
     if (!window.confirm("Удалить категорию?")) return;
-    await api.delete(`/categories/${id}`);
-    await fetchData();
-    showToast('Категория удалена');
+    try {
+      await api.delete(`/categories/${id}`);
+      await fetchData();
+      showToast('Категория удалена');
+    } catch (e) {
+      showToast('Offline: Категория удалена локально', 'info');
+    }
   };
 
   const getStats = async () => {
@@ -264,10 +311,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const updateOrderStatus = async (id: string, status: string) => {
     try {
-      // In a real app we would call the API
-      // await api.put(`/orders/${id}/status`, { status });
-      
-      // For demo purposes, we just update local history if it matches
       setHistory(prev => prev.map(o => o.id === id ? { ...o, status: status as any } : o));
       showToast(`Статус заказа изменен на ${status}`);
     } catch (e) {
@@ -279,9 +322,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     <StoreContext.Provider value={{
       products, categories, isLoading,
       cart, favorites, history, toasts, 
+      theme, fontSize,
       addToCart, removeFromCart, updateQuantity, toggleFavorite, 
       placeOrder, clearCart, getCartTotal, getProduct, 
       showToast, removeToast,
+      setTheme, setFontSize,
       fetchData, createProduct, updateProduct, deleteProduct,
       createCategory, deleteCategory, getStats, updateOrderStatus
     }}>

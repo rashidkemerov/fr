@@ -22,6 +22,7 @@ export interface Product {
   categoryId?: string;
   options?: Option[];
   tags?: string[]; // 'spicy', 'vegan', 'hit', 'new'
+  subcategory?: string;
 }
 
 export interface CartItem {
@@ -47,6 +48,9 @@ export interface Statistics {
   totalRevenue: number;
   popularItems: {name: string, count: number}[];
 }
+
+export type Theme = 'light' | 'dark';
+export type FontSize = 'small' | 'medium' | 'large';
 
 export enum PageRoute {
   CATALOG = '/',
