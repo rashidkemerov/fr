@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/StoreContext';
-import { History, ShoppingBag, Settings } from 'lucide-react';
+import { History, ShoppingBag, Settings, Search, Flame, Leaf, Star } from 'lucide-react';
 
 const Catalog: React.FC = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const Catalog: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [totalPrice, setTotalPrice] = useState(0);
   const [imageLoaded, setImageLoaded] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState('');
   
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const headerRef = useRef<HTMLDivElement>(null);
@@ -30,7 +32,7 @@ const Catalog: React.FC = () => {
     const handleScroll = () => {
       if (isScrollingRef.current) return;
       
-      const scrollPosition = window.scrollY + 150;
+      const scrollPosition = window.scrollY + 180; // Offset for search bar
       
       for (const cat of categories) {
         const element = categoryRefs.current[cat.name];
@@ -53,11 +55,32 @@ const Catalog: React.FC = () => {
     setActiveCategory(cat);
     const element = categoryRefs.current[cat];
     if (element && headerRef.current) {
-      const y = element.getBoundingClientRect().top + window.pageYOffset - 70;
+      const y = element.getBoundingClientRect().top + window.pageYOffset - 130;
       window.scrollTo({ top: y, behavior: 'smooth' });
       setTimeout(() => { isScrollingRef.current = false; }, 500);
     }
   };
+
+  const renderTags = (tags?: string[]) => {
+    if (!tags || tags.length === 0) return null;
+    return (
+      <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
+        {tags.includes('hit') && (
+          <div className="bg-red-500 text-white p-1.5 rounded-full shadow-sm"><Star size={12} fill="currentColor" /></div>
+        )}
+        {tags.includes('spicy') && (
+          <div className="bg-orange-500 text-white p-1.5 rounded-full shadow-sm"><Flame size={12} fill="currentColor" /></div>
+        )}
+        {tags.includes('vegan') && (
+          <div className="bg-green-500 text-white p-1.5 rounded-full shadow-sm"><Leaf size={12} fill="currentColor" /></div>
+        )}
+      </div>
+    );
+  };
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -94,6 +117,28 @@ const Catalog: React.FC = () => {
            </div>
          </div>
 
+         {/* Search Bar */}
+         <div className="px-4 pb-3">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Поиск блюд..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm font-medium focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all shadow-sm"
+              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+         </div>
+
          {/* Categories */}
          <div className="flex overflow-x-auto no-scrollbar px-4 gap-2 pb-3 pt-1">
           {categories.map((cat) => (
@@ -116,14 +161,16 @@ const Catalog: React.FC = () => {
       {/* Catalog Feed */}
       <div className="px-4 pt-2 space-y-8 relative z-10">
         {categories.map(category => {
-          const categoryProducts = products.filter(p => p.category === category.name);
+          // Filter products in this category that match search
+          const categoryProducts = filteredProducts.filter(p => p.category === category.name);
+          
           if (categoryProducts.length === 0) return null;
 
           return (
             <div 
               key={category.id} 
               ref={(el) => { categoryRefs.current[category.name] = el; }}
-              className="scroll-mt-24"
+              className="scroll-mt-32"
             >
               <h2 className="text-lg font-bold text-primary mb-4 px-1 flex items-center gap-2">
                 <span className="w-1 h-6 bg-accent rounded-full block"></span>
@@ -135,7 +182,7 @@ const Catalog: React.FC = () => {
                   <div 
                     key={product.id}
                     onClick={() => navigate(`/product/${product.id}`)}
-                    className="group bg-white rounded-[2rem] p-3 shadow-lg shadow-slate-200/50 border border-slate-50 active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
+                    className="group bg-white rounded-[2rem] p-3 shadow-lg shadow-slate-200/50 border border-slate-50 active:scale-[0.98] transition-all cursor-pointer overflow-hidden relative"
                   >
                     <div className="flex gap-4">
                       {/* Image Container */}
@@ -151,6 +198,7 @@ const Catalog: React.FC = () => {
                         <div className="absolute bottom-0 right-0 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-tl-2xl rounded-br-2xl">
                           <span className="text-sm font-black text-primary">{product.price}₽</span>
                         </div>
+                        {renderTags(product.tags)}
                       </div>
 
                       <div className="flex-1 py-1 pr-1 flex flex-col justify-between">
@@ -182,6 +230,11 @@ const Catalog: React.FC = () => {
             </div>
           );
         })}
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-10 text-gray-400">
+            Ничего не найдено
+          </div>
+        )}
       </div>
 
       {/* Sticky Bottom Cart Bar */}

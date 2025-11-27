@@ -1,3 +1,4 @@
+
 export interface Option {
   id: string;
   name: string;
@@ -9,12 +10,6 @@ export interface Category {
   name: string;
 }
 
-export interface Statistics {
-  totalOrders: number;
-  totalRevenue: number;
-  popularItems: {name: string, count: number}[];
-}
-
 export interface Product {
   id: string;
   name: string;
@@ -23,8 +18,10 @@ export interface Product {
   price: number;
   oldPrice?: number;
   image: string;
-  category: string;
+  category: string; // Stored as Category Name or ID depending on backend, using Name for simplicity in frontend logic matching
+  categoryId?: string;
   options?: Option[];
+  tags?: string[]; // 'spicy', 'vegan', 'hit', 'new'
 }
 
 export interface CartItem {
@@ -42,6 +39,13 @@ export interface Order {
     optionName?: string;
   }[];
   total: number;
+  status?: 'new' | 'cooking' | 'ready' | 'completed' | 'cancelled';
+}
+
+export interface Statistics {
+  totalOrders: number;
+  totalRevenue: number;
+  popularItems: {name: string, count: number}[];
 }
 
 export enum PageRoute {
@@ -49,4 +53,5 @@ export enum PageRoute {
   PRODUCT = '/product',
   CART = '/cart',
   HISTORY = '/history',
+  ADMIN = '/admin',
 }

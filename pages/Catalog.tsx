@@ -1,38 +1,45 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CATEGORIES, MOCK_PRODUCTS } from '../constants';
 import { useStore } from '../store/StoreContext';
-import { History, ShoppingBag } from 'lucide-react';
+import { History, ShoppingBag, Settings, Search, Flame, Leaf, Star } from 'lucide-react';
 
 const Catalog: React.FC = () => {
   const navigate = useNavigate();
-  const { cart, getCartTotal } = useStore();
-  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]);
+  const { cart, getCartTotal, products, categories, isLoading } = useStore();
+  
+  // Use first category as default if available
+  const [activeCategory, setActiveCategory] = useState<string>('');
   const [totalPrice, setTotalPrice] = useState(0);
   const [imageLoaded, setImageLoaded] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState('');
   
-  // Refs for scroll spy
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const headerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
 
   useEffect(() => {
+    if (categories.length > 0 && !activeCategory) {
+      setActiveCategory(categories[0].name);
+    }
+  }, [categories, activeCategory]);
+
+  useEffect(() => {
     setTotalPrice(getCartTotal());
   }, [cart, getCartTotal]);
 
-  // ScrollSpy Logic
   useEffect(() => {
     const handleScroll = () => {
       if (isScrollingRef.current) return;
       
-      const scrollPosition = window.scrollY + 150; // Offset for header
+      const scrollPosition = window.scrollY + 180; // Offset for search bar
       
-      for (const cat of CATEGORIES) {
-        const element = categoryRefs.current[cat];
+      for (const cat of categories) {
+        const element = categoryRefs.current[cat.name];
         if (element) {
           const { offsetTop, offsetHeight } = element;
           if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
-            setActiveCategory(cat);
+            setActiveCategory(cat.name);
             break;
           }
         }
@@ -41,24 +48,48 @@ const Catalog: React.FC = () => {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [categories]);
 
   const scrollToCategory = (cat: string) => {
     isScrollingRef.current = true;
     setActiveCategory(cat);
     const element = categoryRefs.current[cat];
     if (element && headerRef.current) {
-      const y = element.getBoundingClientRect().top + window.pageYOffset - 70; // Header height offset
+      const y = element.getBoundingClientRect().top + window.pageYOffset - 130;
       window.scrollTo({ top: y, behavior: 'smooth' });
       setTimeout(() => { isScrollingRef.current = false; }, 500);
     }
   };
 
+  const renderTags = (tags?: string[]) => {
+    if (!tags || tags.length === 0) return null;
+    return (
+      <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
+        {tags.includes('hit') && (
+          <div className="bg-red-500 text-white p-1.5 rounded-full shadow-sm"><Star size={12} fill="currentColor" /></div>
+        )}
+        {tags.includes('spicy') && (
+          <div className="bg-orange-500 text-white p-1.5 rounded-full shadow-sm"><Flame size={12} fill="currentColor" /></div>
+        )}
+        {tags.includes('vegan') && (
+          <div className="bg-green-500 text-white p-1.5 rounded-full shadow-sm"><Leaf size={12} fill="currentColor" /></div>
+        )}
+      </div>
+    );
+  };
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Загрузка меню...</div>;
+  }
 
   return (
     <div className="min-h-screen pb-28 bg-[#F8FAFC]">
-      {/* Background Decoration */}
       <div className="fixed top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-50 to-transparent pointer-events-none z-0" />
 
       {/* Sticky Header */}
@@ -68,50 +99,82 @@ const Catalog: React.FC = () => {
              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Меню</span>
              <h1 className="text-xl font-black text-primary">KisKis</h1>
            </div>
-           <button 
-             onClick={() => navigate('/history')}
-             className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-primary active:scale-95 transition-transform"
-             aria-label="История заказов"
-           >
-             <History size={20} strokeWidth={2} />
-           </button>
+           <div className="flex gap-3">
+             <button 
+               onClick={() => navigate('/admin')}
+               className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-primary active:scale-95 transition-transform"
+               aria-label="Админ панель"
+             >
+                <Settings size={20} strokeWidth={2} />
+             </button>
+             <button 
+               onClick={() => navigate('/history')}
+               className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-primary active:scale-95 transition-transform"
+               aria-label="История заказов"
+             >
+               <History size={20} strokeWidth={2} />
+             </button>
+           </div>
+         </div>
+
+         {/* Search Bar */}
+         <div className="px-4 pb-3">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Поиск блюд..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm font-medium focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all shadow-sm"
+              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
          </div>
 
          {/* Categories */}
          <div className="flex overflow-x-auto no-scrollbar px-4 gap-2 pb-3 pt-1">
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
-              key={cat}
-              onClick={() => scrollToCategory(cat)}
+              key={cat.id}
+              onClick={() => scrollToCategory(cat.name)}
               className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all duration-300 select-none ${
-                activeCategory === cat
+                activeCategory === cat.name
                   ? 'bg-primary text-white shadow-lg shadow-primary/30 scale-105'
                   : 'bg-white text-gray-500 shadow-sm border border-gray-100 hover:bg-gray-50'
               }`}
             >
-              {cat}
+              {cat.name}
             </button>
           ))}
-          {/* Spacer for right padding */}
           <div className="w-2 flex-shrink-0" /> 
         </div>
       </div>
 
       {/* Catalog Feed */}
       <div className="px-4 pt-2 space-y-8 relative z-10">
-        {CATEGORIES.map(category => {
-          const categoryProducts = MOCK_PRODUCTS.filter(p => p.category === category);
+        {categories.map(category => {
+          // Filter products in this category that match search
+          const categoryProducts = filteredProducts.filter(p => p.category === category.name);
+          
           if (categoryProducts.length === 0) return null;
 
           return (
             <div 
-              key={category} 
-              ref={(el) => { categoryRefs.current[category] = el; }}
-              className="scroll-mt-24"
+              key={category.id} 
+              ref={(el) => { categoryRefs.current[category.name] = el; }}
+              className="scroll-mt-32"
             >
               <h2 className="text-lg font-bold text-primary mb-4 px-1 flex items-center gap-2">
                 <span className="w-1 h-6 bg-accent rounded-full block"></span>
-                {category}
+                {category.name}
               </h2>
               
               <div className="grid gap-6">
@@ -119,7 +182,7 @@ const Catalog: React.FC = () => {
                   <div 
                     key={product.id}
                     onClick={() => navigate(`/product/${product.id}`)}
-                    className="group bg-white rounded-[2rem] p-3 shadow-lg shadow-slate-200/50 border border-slate-50 active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
+                    className="group bg-white rounded-[2rem] p-3 shadow-lg shadow-slate-200/50 border border-slate-50 active:scale-[0.98] transition-all cursor-pointer overflow-hidden relative"
                   >
                     <div className="flex gap-4">
                       {/* Image Container */}
@@ -132,13 +195,12 @@ const Catalog: React.FC = () => {
                           onLoad={() => setImageLoaded(prev => ({...prev, [product.id]: true}))}
                           className={`w-full h-full object-cover transition-opacity duration-500 ${imageLoaded[product.id] ? 'opacity-100' : 'opacity-0'}`}
                         />
-                         {/* Price Tag Overlay on Image */}
                         <div className="absolute bottom-0 right-0 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-tl-2xl rounded-br-2xl">
                           <span className="text-sm font-black text-primary">{product.price}₽</span>
                         </div>
+                        {renderTags(product.tags)}
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 py-1 pr-1 flex flex-col justify-between">
                         <div>
                           <h3 className="font-bold text-primary text-sm uppercase leading-tight mb-2 line-clamp-2">
@@ -168,6 +230,11 @@ const Catalog: React.FC = () => {
             </div>
           );
         })}
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-10 text-gray-400">
+            Ничего не найдено
+          </div>
+        )}
       </div>
 
       {/* Sticky Bottom Cart Bar */}

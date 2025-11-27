@@ -21,6 +21,7 @@ export interface Product {
   category: string; // Stored as Category Name or ID depending on backend, using Name for simplicity in frontend logic matching
   categoryId?: string;
   options?: Option[];
+  tags?: string[]; // 'spicy', 'vegan', 'hit', 'new'
 }
 
 export interface CartItem {
@@ -38,7 +39,7 @@ export interface Order {
     optionName?: string;
   }[];
   total: number;
-  status?: string;
+  status?: 'new' | 'cooking' | 'ready' | 'completed' | 'cancelled';
 }
 
 export interface Statistics {

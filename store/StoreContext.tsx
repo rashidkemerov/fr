@@ -1,43 +1,8 @@
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { CartItem, Order, Product, Category, Statistics } from '../types';
+import { api } from '../api/client';
 import { MOCK_PRODUCTS, CATEGORIES as MOCK_CATEGORIES } from '../constants';
-
-const API_URL = 'http://localhost:8080/api';
-
-const api = {
-  async get<T>(endpoint: string): Promise<T> {
-    const res = await fetch(`${API_URL}${endpoint}`);
-    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
-    return res.json();
-  },
-
-  async post<T>(endpoint: string, body: any): Promise<T> {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
-    return res.json();
-  },
-
-  async put<T>(endpoint: string, body: any): Promise<T> {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
-    return res.json();
-  },
-
-  async delete(endpoint: string): Promise<void> {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      method: 'DELETE',
-    });
-    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
-  }
-};
 
 interface Toast {
   id: number;
@@ -54,6 +19,7 @@ interface StoreContextType {
   toasts: Toast[];
   isLoading: boolean;
   
+  // Cart Actions
   addToCart: (productId: string, quantity: number, optionId?: string) => void;
   removeFromCart: (productId: string, optionId?: string) => void;
   updateQuantity: (productId: string, delta: number, optionId?: string) => void;
@@ -63,9 +29,10 @@ interface StoreContextType {
   getCartTotal: () => number;
   getProduct: (id: string) => Product | undefined;
   
+  // UI Actions
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: number) => void;
-
+  
   // Admin Actions
   fetchData: () => Promise<void>;
   createProduct: (product: Partial<Product>) => Promise<void>;
@@ -74,17 +41,15 @@ interface StoreContextType {
   createCategory: (name: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   getStats: () => Promise<Statistics | null>;
+  updateOrderStatus: (id: string, status: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Initialize with Mocks to ensure offline functionality or if backend is missing
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
-  const [categories, setCategories] = useState<Category[]>(
-    MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name }))
-  );
-  const [isLoading, setIsLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -109,13 +74,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // Haptic feedback helper
   const vibrate = (pattern: number | number[] = 10) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(pattern);
     }
   };
 
+  // Initial Fetch
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -126,7 +91,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setProducts(prods);
       setCategories(cats);
     } catch (e) {
-      console.warn("Failed to load initial data", e);
+      console.error("Failed to load initial data", e);
+      setProducts(MOCK_PRODUCTS);
+      setCategories(MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })));
     } finally {
       setIsLoading(false);
     }
@@ -218,7 +185,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     vibrate([50, 50, 50]);
     const total = getCartTotal();
     
-    // Prepare order payload
     const orderItems = cart.map(item => {
       const product = getProduct(item.productId);
       const option = product?.options?.find(o => o.id === item.selectedOptionId);
@@ -229,28 +195,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
     });
 
-    // 1. Optimistic UI Update (Offline First approach)
     const optimisticOrder: Order = {
       id: "loc-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
       date: new Date().toLocaleString('ru-RU'),
       total,
-      items: orderItems
+      items: orderItems,
+      status: 'new'
     };
     
     setHistory(prev => [optimisticOrder, ...prev]);
-    // Clear cart immediately for better UX
     setCart([]);
 
-    // 2. Send to Backend
     try {
-      await api.post('/orders', {
+      const response = await api.post<Order>('/orders', {
         total: total,
         items: orderItems
       });
-      showToast('Заказ успешно отправлен на кухню!', 'success');
+      // Update the local ID with real ID if needed, or just refresh history
+      showToast(`Заказ ${response.id || 'отправлен'} на кухне!`, 'success');
     } catch (error) {
-      console.warn('Backend unreachable, using offline mode:', error);
-      showToast('Нет связи. Заказ сохранен локально.', 'info');
+      console.warn('Backend unavailable, offline mode:', error);
+      showToast('Нет связи. Заказ локально.', 'info');
     }
   };
 
@@ -259,55 +224,35 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- Admin Functions ---
 
   const createProduct = async (product: Partial<Product>) => {
-    try {
-      await api.post('/products', product);
-      await fetchData();
-      showToast('Продукт создан');
-    } catch (e) {
-      showToast('Ошибка создания продукта', 'error');
-    }
+    await api.post('/products', product);
+    await fetchData();
+    showToast('Продукт создан');
   };
 
   const updateProduct = async (id: string, product: Partial<Product>) => {
-    try {
-      await api.put(`/products/${id}`, product);
-      await fetchData();
-      showToast('Продукт обновлен');
-    } catch (e) {
-      showToast('Ошибка обновления продукта', 'error');
-    }
+    await api.put(`/products/${id}`, product);
+    await fetchData();
+    showToast('Продукт обновлен');
   };
 
   const deleteProduct = async (id: string) => {
     if (!window.confirm("Удалить этот продукт?")) return;
-    try {
-      await api.delete(`/products/${id}`);
-      await fetchData();
-      showToast('Продукт удален', 'info');
-    } catch (e) {
-      showToast('Ошибка удаления продукта', 'error');
-    }
+    await api.delete(`/products/${id}`);
+    await fetchData();
+    showToast('Продукт удален', 'info');
   };
 
   const createCategory = async (name: string) => {
-    try {
-      await api.post('/categories', { name });
-      await fetchData();
-      showToast('Категория создана');
-    } catch (e) {
-      showToast('Ошибка создания категории', 'error');
-    }
+    await api.post('/categories', { name });
+    await fetchData();
+    showToast('Категория создана');
   };
 
   const deleteCategory = async (id: string) => {
     if (!window.confirm("Удалить категорию?")) return;
-    try {
-      await api.delete(`/categories/${id}`);
-      await fetchData();
-      showToast('Категория удалена');
-    } catch (e) {
-      showToast('Ошибка удаления категории', 'error');
-    }
+    await api.delete(`/categories/${id}`);
+    await fetchData();
+    showToast('Категория удалена');
   };
 
   const getStats = async () => {
@@ -318,10 +263,28 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const updateOrderStatus = async (id: string, status: string) => {
+    try {
+      // In a real app we would call the API
+      // await api.put(`/orders/${id}/status`, { status });
+      
+      // For demo purposes, we just update local history if it matches
+      setHistory(prev => prev.map(o => o.id === id ? { ...o, status: status as any } : o));
+      showToast(`Статус заказа изменен на ${status}`);
+    } catch (e) {
+      showToast('Ошибка обновления статуса', 'error');
+    }
+  };
+
   return (
     <StoreContext.Provider value={{
-      cart, favorites, history, toasts, addToCart, removeFromCart, updateQuantity, toggleFavorite, placeOrder, clearCart, getCartTotal, getProduct, showToast, removeToast,
-      products, categories, isLoading, fetchData, createProduct, updateProduct, deleteProduct, createCategory, deleteCategory, getStats
+      products, categories, isLoading,
+      cart, favorites, history, toasts, 
+      addToCart, removeFromCart, updateQuantity, toggleFavorite, 
+      placeOrder, clearCart, getCartTotal, getProduct, 
+      showToast, removeToast,
+      fetchData, createProduct, updateProduct, deleteProduct,
+      createCategory, deleteCategory, getStats, updateOrderStatus
     }}>
       {children}
     </StoreContext.Provider>

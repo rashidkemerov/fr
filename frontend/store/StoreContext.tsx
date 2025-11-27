@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { CartItem, Order, Product, Category, Statistics } from '../types';
 import { api } from '../api/client';
+import { MOCK_PRODUCTS, CATEGORIES as MOCK_CATEGORIES } from '../constants';
 
 interface Toast {
   id: number;
@@ -40,6 +40,7 @@ interface StoreContextType {
   createCategory: (name: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   getStats: () => Promise<Statistics | null>;
+  updateOrderStatus: (id: string, status: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -83,15 +84,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setIsLoading(true);
     try {
       const [prods, cats] = await Promise.all([
-        api.get<Product[]>('/products').catch(() => []),
-        api.get<Category[]>('/categories').catch(() => [])
+        api.get<Product[]>('/products').catch(() => MOCK_PRODUCTS),
+        api.get<Category[]>('/categories').catch(() => MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })))
       ]);
       setProducts(prods);
       setCategories(cats);
     } catch (e) {
       console.error("Failed to load initial data", e);
-      // Fallback for offline or dev if backend is down
-      // setProducts(MOCK_PRODUCTS); // Optional: keep mock as fallback
+      setProducts(MOCK_PRODUCTS);
+      setCategories(MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })));
     } finally {
       setIsLoading(false);
     }
@@ -197,34 +198,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       id: "loc-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
       date: new Date().toLocaleString('ru-RU'),
       total,
-      items: orderItems
+      items: orderItems,
+      status: 'new'
     };
     
     setHistory(prev => [optimisticOrder, ...prev]);
     setCart([]);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-      const response = await fetch('http://localhost:8080/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          total: total,
-          items: orderItems
-        }),
-        signal: controller.signal
+      const response = await api.post<Order>('/orders', {
+        total: total,
+        items: orderItems
       });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        showToast(`Заказ ${data.id} на кухне!`, 'success');
-      } else {
-        showToast('Заказ сохранен (Оффлайн)', 'info');
-      }
+      // Update the local ID with real ID if needed, or just refresh history
+      showToast(`Заказ ${response.id || 'отправлен'} на кухне!`, 'success');
     } catch (error) {
       console.warn('Backend unavailable, offline mode:', error);
       showToast('Нет связи. Заказ локально.', 'info');
@@ -275,6 +262,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const updateOrderStatus = async (id: string, status: string) => {
+    try {
+      // In a real app we would call the API
+      // await api.put(`/orders/${id}/status`, { status });
+      
+      // For demo purposes, we just update local history if it matches
+      setHistory(prev => prev.map(o => o.id === id ? { ...o, status: status as any } : o));
+      showToast(`Статус заказа изменен на ${status}`);
+    } catch (e) {
+      showToast('Ошибка обновления статуса', 'error');
+    }
+  };
+
   return (
     <StoreContext.Provider value={{
       products, categories, isLoading,
@@ -283,7 +283,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       placeOrder, clearCart, getCartTotal, getProduct, 
       showToast, removeToast,
       fetchData, createProduct, updateProduct, deleteProduct,
-      createCategory, deleteCategory, getStats
+      createCategory, deleteCategory, getStats, updateOrderStatus
     }}>
       {children}
     </StoreContext.Provider>
