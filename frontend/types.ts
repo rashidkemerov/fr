@@ -8,7 +8,7 @@ export interface Option {
 export interface Category {
   id: string;
   name: string;
-}
+  }
 
 export interface Product {
   id: string;
@@ -23,6 +23,7 @@ export interface Product {
   options?: Option[];
   tags?: string[]; // 'spicy', 'vegan', 'hit', 'new'
   subcategory?: string;
+  updatedAt?: string;
 }
 
 export interface CartItem {

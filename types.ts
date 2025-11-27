@@ -23,6 +23,7 @@ export interface Product {
   options?: Option[];
   tags?: string[]; // 'spicy', 'vegan', 'hit', 'new'
   subcategory?: string;
+  updatedAt?: string;
 }
 
 export interface CartItem {

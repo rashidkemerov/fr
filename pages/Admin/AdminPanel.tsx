@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/StoreContext';
 import { BackButton } from '../../components/ui/BackButton';
-import { Plus, Trash2, Edit2, BarChart3, Package, Layers, X, ChefHat, Check, Clock, Users, TrendingUp, TrendingDown, DollarSign, Calendar, Star, ShoppingBag, PieChart } from 'lucide-react';
+import { Plus, Trash2, Edit2, BarChart3, Package, Layers, X, ChefHat, Check, Clock, Users, TrendingUp, TrendingDown, DollarSign, Calendar, Star, ShoppingBag, PieChart, Search, ChevronDown, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { Product, Option, Order } from '../../types';
 // @ts-ignore
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart as RePieChart, Pie, Legend } from 'recharts';
@@ -20,6 +20,11 @@ const AdminPanel: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   
+  // Products Management State
+  const [adminSearch, setAdminSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState<{key: 'price' | 'updatedAt' | 'name', direction: 'asc' | 'desc'}>({key: 'updatedAt', direction: 'desc'});
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  
   // Statistics State
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
   const [mockStats, setMockStats] = useState<any>(null);
@@ -31,6 +36,47 @@ const AdminPanel: React.FC = () => {
     }
   }, [activeTab, timeRange]);
 
+  // --- Product Grouping & Sorting Logic ---
+  
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => 
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const getProcessedProducts = () => {
+    let filtered = products.filter(p => p.name.toLowerCase().includes(adminSearch.toLowerCase()));
+    
+    filtered.sort((a, b) => {
+      let valA: any = a[sortConfig.key];
+      let valB: any = b[sortConfig.key];
+
+      if (sortConfig.key === 'updatedAt') {
+         valA = a.updatedAt || '0';
+         valB = b.updatedAt || '0';
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    const grouped: Record<string, Record<string, Product[]>> = {};
+
+    filtered.forEach(p => {
+       const cat = p.category || 'Без категории';
+       const sub = p.subcategory || 'Общее';
+       if (!grouped[cat]) grouped[cat] = {};
+       if (!grouped[cat][sub]) grouped[cat][sub] = [];
+       grouped[cat][sub].push(p);
+    });
+
+    return grouped;
+  };
+
+  const groupedProducts = getProcessedProducts();
+
+  // --- Stats Generation ---
   const generateMockStats = () => {
     // Mock Data Generator logic to simulate realistic business metrics
     const periods = {
@@ -74,6 +120,8 @@ const AdminPanel: React.FC = () => {
     });
   };
 
+  // --- Handlers ---
+
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProduct) {
@@ -88,12 +136,42 @@ const AdminPanel: React.FC = () => {
   };
 
   const openEditModal = (p?: Product) => {
-    setEditingProduct(p || {
+    setEditingProduct(p ? JSON.parse(JSON.stringify(p)) : {
       name: '', description: '', price: 0, 
       category: categories[0]?.name || '', 
       ingredients: [], options: [], tags: [], image: 'https://placehold.co/600x400'
     });
     setIsModalOpen(true);
+  };
+
+  const handleAddOption = () => {
+    setEditingProduct(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        options: [...(prev.options || []), { id: Date.now().toString(), name: '', priceModifier: 0 }]
+      };
+    });
+  };
+
+  const handleRemoveOption = (optId: string) => {
+    setEditingProduct(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        options: prev.options?.filter(o => o.id !== optId) || []
+      };
+    });
+  };
+
+  const handleUpdateOption = (optId: string, field: keyof Option, value: any) => {
+    setEditingProduct(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        options: prev.options?.map(o => o.id === optId ? { ...o, [field]: value } : o) || []
+      };
+    });
   };
 
   const toggleTag = (tag: string) => {
@@ -159,33 +237,107 @@ const AdminPanel: React.FC = () => {
       <div className="px-4">
         {/* PRODUCTS TAB */}
         {activeTab === 'products' && (
-          <div>
-            <button 
-              onClick={() => openEditModal()}
-              className="w-full mb-4 bg-accent text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"
-            >
-              <Plus size={20} /> Добавить товар
-            </button>
+          <div className="space-y-4">
+            {/* Toolbar */}
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => openEditModal()}
+                className="w-full bg-accent text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-orange-200"
+              >
+                <Plus size={20} /> Добавить товар
+              </button>
+              
+              <div className="flex gap-2">
+                 <div className="relative flex-1">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                   <input 
+                     type="text" 
+                     placeholder="Поиск по названию..."
+                     value={adminSearch}
+                     onChange={(e) => setAdminSearch(e.target.value)}
+                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-accent"
+                   />
+                 </div>
+                 
+                 <div className="relative">
+                   <select
+                     value={sortConfig.key}
+                     onChange={(e) => setSortConfig(prev => ({...prev, key: e.target.value as any}))}
+                     className="h-full pl-3 pr-8 rounded-xl border border-slate-200 text-sm font-bold bg-white appearance-none focus:outline-none"
+                   >
+                     <option value="updatedAt">Дата</option>
+                     <option value="price">Цена</option>
+                     <option value="name">Имя</option>
+                   </select>
+                   <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                     <ArrowUpDown size={14} className="text-gray-400"/>
+                   </div>
+                 </div>
+
+                 <button 
+                   onClick={() => setSortConfig(prev => ({...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc'}))}
+                   className="px-3 rounded-xl border border-slate-200 bg-white text-slate-600 flex items-center"
+                 >
+                   {sortConfig.direction === 'asc' ? <TrendingUp size={16}/> : <TrendingDown size={16}/>}
+                 </button>
+              </div>
+            </div>
             
-            <div className="space-y-3">
-              {products.map(p => (
-                <div key={p.id} className="bg-white p-3 rounded-2xl shadow-sm flex gap-3">
-                  <img src={p.image} className="w-16 h-16 rounded-xl object-cover bg-slate-100" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-sm truncate">{p.name}</h3>
-                    <p className="text-xs text-gray-400">{p.category} • {p.price}₽</p>
-                    {p.tags && p.tags.length > 0 && (
-                      <div className="flex gap-1 mt-1">
-                        {p.tags.map(t => <span key={t} className="text-[10px] bg-slate-100 px-1 rounded">{t}</span>)}
-                      </div>
-                    )}
+            {/* Grouped List */}
+            <div className="space-y-2">
+              {Object.entries(groupedProducts).map(([catName, subcats]) => (
+                <div key={catName} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                  {/* Category Header */}
+                  <div 
+                    onClick={() => toggleCategory(catName)}
+                    className="p-3 bg-slate-50 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors"
+                  >
+                    <h3 className="font-black text-primary text-sm uppercase flex items-center gap-2">
+                      {expandedCategories.includes(catName) ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
+                      {catName}
+                      <span className="text-gray-400 text-xs font-normal lowercase">({Object.values(subcats).flat().length})</span>
+                    </h3>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <button onClick={() => openEditModal(p)} className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Edit2 size={16} /></button>
-                    <button onClick={() => deleteProduct(p.id)} className="p-2 bg-red-50 text-red-600 rounded-lg"><Trash2 size={16} /></button>
-                  </div>
+
+                  {/* Products Body */}
+                  {expandedCategories.includes(catName) && (
+                     <div className="p-2 space-y-4">
+                        {Object.entries(subcats).map(([subName, items]) => (
+                          <div key={subName}>
+                             {subName !== 'Общее' && (
+                               <h4 className="text-xs font-bold text-gray-400 uppercase mb-2 px-2">{subName}</h4>
+                             )}
+                             <div className="grid gap-2">
+                               {items.map(p => (
+                                 <div key={p.id} className="flex gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                                   <img src={p.image} className="w-12 h-12 rounded-lg object-cover bg-slate-200" />
+                                   <div className="flex-1 min-w-0">
+                                     <div className="flex justify-between items-start">
+                                       <h4 className="font-bold text-sm text-primary truncate">{p.name}</h4>
+                                       <span className="font-bold text-xs text-accent whitespace-nowrap">{p.price}₽</span>
+                                     </div>
+                                     <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{p.description}</p>
+                                     {p.updatedAt && <p className="text-[9px] text-gray-300 mt-1">Updated: {new Date(p.updatedAt).toLocaleDateString()}</p>}
+                                   </div>
+                                   <div className="flex gap-1 items-center">
+                                      <button onClick={() => openEditModal(p)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><Edit2 size={14} /></button>
+                                      <button onClick={() => deleteProduct(p.id)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><Trash2 size={14} /></button>
+                                   </div>
+                                 </div>
+                               ))}
+                             </div>
+                          </div>
+                        ))}
+                     </div>
+                  )}
                 </div>
               ))}
+              
+              {Object.keys(groupedProducts).length === 0 && (
+                <div className="text-center py-12 text-gray-400 text-sm">
+                   Товары не найдены
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -467,7 +619,7 @@ const AdminPanel: React.FC = () => {
                 <input 
                   value={editingProduct.name} 
                   onChange={e => setEditingProduct({...editingProduct, name: e.target.value})}
-                  className="w-full p-3 bg-slate-50 rounded-xl mt-1" 
+                  className="w-full p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100" 
                   required 
                 />
               </div>
@@ -479,7 +631,7 @@ const AdminPanel: React.FC = () => {
                     type="number"
                     value={editingProduct.price} 
                     onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})}
-                    className="w-full p-3 bg-slate-50 rounded-xl mt-1" 
+                    className="w-full p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100" 
                     required 
                   />
                  </div>
@@ -489,7 +641,7 @@ const AdminPanel: React.FC = () => {
                     type="number"
                     value={editingProduct.oldPrice || ''} 
                     onChange={e => setEditingProduct({...editingProduct, oldPrice: Number(e.target.value)})}
-                    className="w-full p-3 bg-slate-50 rounded-xl mt-1" 
+                    className="w-full p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100" 
                   />
                  </div>
               </div>
@@ -499,10 +651,42 @@ const AdminPanel: React.FC = () => {
                 <select 
                    value={editingProduct.category}
                    onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}
-                   className="w-full p-3 bg-slate-50 rounded-xl mt-1"
+                   className="w-full p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100"
                 >
                   {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
+              </div>
+
+              {/* Options Management */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Опции товара</label>
+                  <button type="button" onClick={handleAddOption} className="text-xs font-bold text-accent">+ Добавить</button>
+                </div>
+                {editingProduct.options && editingProduct.options.length > 0 ? (
+                  <div className="space-y-2">
+                    {editingProduct.options.map((opt, idx) => (
+                      <div key={opt.id} className="flex gap-2">
+                         <input 
+                           placeholder="Название (напр. Большой)"
+                           value={opt.name}
+                           onChange={(e) => handleUpdateOption(opt.id, 'name', e.target.value)}
+                           className="flex-1 p-2 text-sm rounded-lg border border-slate-200"
+                         />
+                         <input 
+                           type="number"
+                           placeholder="+Цена"
+                           value={opt.priceModifier}
+                           onChange={(e) => handleUpdateOption(opt.id, 'priceModifier', Number(e.target.value))}
+                           className="w-20 p-2 text-sm rounded-lg border border-slate-200"
+                         />
+                         <button type="button" onClick={() => handleRemoveOption(opt.id)} className="text-red-400"><X size={16}/></button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">Нет опций</p>
+                )}
               </div>
 
               <div>
@@ -530,7 +714,7 @@ const AdminPanel: React.FC = () => {
                 <textarea 
                   value={editingProduct.description} 
                   onChange={e => setEditingProduct({...editingProduct, description: e.target.value})}
-                  className="w-full p-3 bg-slate-50 rounded-xl mt-1 h-24" 
+                  className="w-full p-3 bg-slate-50 rounded-xl mt-1 h-24 border border-slate-100" 
                 />
               </div>
 
@@ -539,11 +723,11 @@ const AdminPanel: React.FC = () => {
                 <input 
                   value={editingProduct.image} 
                   onChange={e => setEditingProduct({...editingProduct, image: e.target.value})}
-                  className="w-full p-3 bg-slate-50 rounded-xl mt-1" 
+                  className="w-full p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100" 
                 />
               </div>
 
-              <button className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg mt-4">
+              <button className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg mt-4 shadow-lg shadow-primary/30">
                 Сохранить
               </button>
             </form>

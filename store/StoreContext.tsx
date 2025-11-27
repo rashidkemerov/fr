@@ -248,23 +248,38 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- Admin Functions ---
 
   const createProduct = async (product: Partial<Product>) => {
+    const enrichedProduct = {
+      ...product,
+      updatedAt: new Date().toISOString()
+    };
     try {
-      await api.post('/products', product);
+      await api.post('/products', enrichedProduct);
       await fetchData();
       showToast('Продукт создан');
     } catch (e) {
       console.warn("Offline: Product create mocked");
+      // Optimistic update for offline mode
+      const newProd = {
+        id: `offline-${Date.now()}`,
+        ...enrichedProduct
+      } as Product;
+      setProducts(prev => [...prev, newProd]);
       showToast('Offline: Продукт создан локально', 'info');
     }
   };
 
   const updateProduct = async (id: string, product: Partial<Product>) => {
+    const enrichedProduct = {
+      ...product,
+      updatedAt: new Date().toISOString()
+    };
     try {
-      await api.put(`/products/${id}`, product);
+      await api.put(`/products/${id}`, enrichedProduct);
       await fetchData();
       showToast('Продукт обновлен');
     } catch (e) {
       console.warn("Offline: Product update mocked");
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, ...enrichedProduct } : p));
       showToast('Offline: Продукт обновлен локально', 'info');
     }
   };
@@ -276,6 +291,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await fetchData();
       showToast('Продукт удален', 'info');
     } catch (e) {
+      setProducts(prev => prev.filter(p => p.id !== id));
       showToast('Offline: Продукт удален локально', 'info');
     }
   };
@@ -286,6 +302,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await fetchData();
       showToast('Категория создана');
     } catch (e) {
+      setCategories(prev => [...prev, { id: `cat-${Date.now()}`, name }]);
       showToast('Offline: Категория создана локально', 'info');
     }
   };
@@ -297,6 +314,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await fetchData();
       showToast('Категория удалена');
     } catch (e) {
+      setCategories(prev => prev.filter(c => c.id !== id));
       showToast('Offline: Категория удалена локально', 'info');
     }
   };
