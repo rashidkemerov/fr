@@ -1,0 +1,5 @@
+{
+  "name": "KisKis QR Menu",
+  "description": "A fast, mobile-first PWA QR menu application with catalog, product details, cart, and order history.",
+  "requestFramePermissions": []
+}

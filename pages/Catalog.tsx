@@ -1,0 +1,198 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { CATEGORIES, MOCK_PRODUCTS } from '../constants';
+import { useStore } from '../store/StoreContext';
+import { History, ShoppingBag } from 'lucide-react';
+
+const Catalog: React.FC = () => {
+  const navigate = useNavigate();
+  const { cart, getCartTotal } = useStore();
+  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState<Record<string, boolean>>({});
+  
+  // Refs for scroll spy
+  const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const headerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
+
+  useEffect(() => {
+    setTotalPrice(getCartTotal());
+  }, [cart, getCartTotal]);
+
+  // ScrollSpy Logic
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isScrollingRef.current) return;
+      
+      const scrollPosition = window.scrollY + 150; // Offset for header
+      
+      for (const cat of CATEGORIES) {
+        const element = categoryRefs.current[cat];
+        if (element) {
+          const { offsetTop, offsetHeight } = element;
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            setActiveCategory(cat);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToCategory = (cat: string) => {
+    isScrollingRef.current = true;
+    setActiveCategory(cat);
+    const element = categoryRefs.current[cat];
+    if (element && headerRef.current) {
+      const y = element.getBoundingClientRect().top + window.pageYOffset - 70; // Header height offset
+      window.scrollTo({ top: y, behavior: 'smooth' });
+      setTimeout(() => { isScrollingRef.current = false; }, 500);
+    }
+  };
+
+  const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+  return (
+    <div className="min-h-screen pb-28 bg-[#F8FAFC]">
+      {/* Background Decoration */}
+      <div className="fixed top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-50 to-transparent pointer-events-none z-0" />
+
+      {/* Sticky Header */}
+      <div ref={headerRef} className="sticky top-0 z-30 bg-[#F8FAFC]/95 backdrop-blur-md shadow-sm transition-all duration-300">
+         <div className="flex justify-between items-center px-4 py-3">
+           <div className="flex flex-col">
+             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Меню</span>
+             <h1 className="text-xl font-black text-primary">KisKis</h1>
+           </div>
+           <button 
+             onClick={() => navigate('/history')}
+             className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-primary active:scale-95 transition-transform"
+             aria-label="История заказов"
+           >
+             <History size={20} strokeWidth={2} />
+           </button>
+         </div>
+
+         {/* Categories */}
+         <div className="flex overflow-x-auto no-scrollbar px-4 gap-2 pb-3 pt-1">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => scrollToCategory(cat)}
+              className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all duration-300 select-none ${
+                activeCategory === cat
+                  ? 'bg-primary text-white shadow-lg shadow-primary/30 scale-105'
+                  : 'bg-white text-gray-500 shadow-sm border border-gray-100 hover:bg-gray-50'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+          {/* Spacer for right padding */}
+          <div className="w-2 flex-shrink-0" /> 
+        </div>
+      </div>
+
+      {/* Catalog Feed */}
+      <div className="px-4 pt-2 space-y-8 relative z-10">
+        {CATEGORIES.map(category => {
+          const categoryProducts = MOCK_PRODUCTS.filter(p => p.category === category);
+          if (categoryProducts.length === 0) return null;
+
+          return (
+            <div 
+              key={category} 
+              ref={(el) => { categoryRefs.current[category] = el; }}
+              className="scroll-mt-24"
+            >
+              <h2 className="text-lg font-bold text-primary mb-4 px-1 flex items-center gap-2">
+                <span className="w-1 h-6 bg-accent rounded-full block"></span>
+                {category}
+              </h2>
+              
+              <div className="grid gap-6">
+                {categoryProducts.map((product) => (
+                  <div 
+                    key={product.id}
+                    onClick={() => navigate(`/product/${product.id}`)}
+                    className="group bg-white rounded-[2rem] p-3 shadow-lg shadow-slate-200/50 border border-slate-50 active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
+                  >
+                    <div className="flex gap-4">
+                      {/* Image Container */}
+                      <div className="relative w-32 h-32 flex-shrink-0 rounded-[1.5rem] overflow-hidden bg-gray-100">
+                        {!imageLoaded[product.id] && <div className="absolute inset-0 skeleton" />}
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          loading="lazy"
+                          onLoad={() => setImageLoaded(prev => ({...prev, [product.id]: true}))}
+                          className={`w-full h-full object-cover transition-opacity duration-500 ${imageLoaded[product.id] ? 'opacity-100' : 'opacity-0'}`}
+                        />
+                         {/* Price Tag Overlay on Image */}
+                        <div className="absolute bottom-0 right-0 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-tl-2xl rounded-br-2xl">
+                          <span className="text-sm font-black text-primary">{product.price}₽</span>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 py-1 pr-1 flex flex-col justify-between">
+                        <div>
+                          <h3 className="font-bold text-primary text-sm uppercase leading-tight mb-2 line-clamp-2">
+                            {product.name}
+                          </h3>
+                          <p className="text-xs text-gray-400 font-medium line-clamp-2 leading-relaxed">
+                            {product.description}
+                          </p>
+                        </div>
+                        
+                        <div className="flex justify-between items-end mt-2">
+                          {product.oldPrice ? (
+                            <span className="text-xs text-red-400 line-through decoration-2">
+                              {product.oldPrice}₽
+                            </span>
+                          ) : <span />}
+                          
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                            <ShoppingBag size={14} strokeWidth={3} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Sticky Bottom Cart Bar */}
+      <div className={`fixed bottom-0 left-0 w-full p-4 z-40 transition-transform duration-300 ${totalItems > 0 ? 'translate-y-0' : 'translate-y-[120%]'}`}>
+        <div className="glass-panel rounded-3xl shadow-2xl p-2 border border-white/60">
+          <div className="flex justify-between items-center bg-primary rounded-2xl p-1 pr-2 shadow-lg">
+            <div className="flex flex-col px-5 py-2">
+               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Итого</span>
+               <span className="text-lg font-black text-white">{totalPrice}₽</span>
+            </div>
+            
+            <button 
+              onClick={() => navigate('/cart')}
+              className="bg-white text-primary rounded-xl px-6 py-3 font-bold uppercase tracking-wider flex items-center gap-3 active:scale-95 transition-transform"
+            >
+              Заказать 
+              <span className="bg-accent text-white text-xs px-2 py-0.5 rounded-md font-black min-w-[20px] text-center">
+                {totalItems}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Catalog;

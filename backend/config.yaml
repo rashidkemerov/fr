@@ -1,0 +1,16 @@
+server:
+  port: "8080"
+  timeout: 10s
+
+database:
+  dsn: "postgres://user:password@localhost:5432/kiskis?sslmode=disable"
+  max_conns: 10
+
+valkey:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+telegram:
+  token: ""
+  admin_id: 0

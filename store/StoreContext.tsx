@@ -1,0 +1,335 @@
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { CartItem, Order, Product, Category, Statistics } from '../types';
+import { MOCK_PRODUCTS, CATEGORIES as MOCK_CATEGORIES } from '../constants';
+
+const API_URL = 'http://localhost:8080/api';
+
+const api = {
+  async get<T>(endpoint: string): Promise<T> {
+    const res = await fetch(`${API_URL}${endpoint}`);
+    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+    return res.json();
+  },
+
+  async post<T>(endpoint: string, body: any): Promise<T> {
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+    return res.json();
+  },
+
+  async put<T>(endpoint: string, body: any): Promise<T> {
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+    return res.json();
+  },
+
+  async delete(endpoint: string): Promise<void> {
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+  }
+};
+
+interface Toast {
+  id: number;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+interface StoreContextType {
+  products: Product[];
+  categories: Category[];
+  cart: CartItem[];
+  favorites: string[];
+  history: Order[];
+  toasts: Toast[];
+  isLoading: boolean;
+  
+  addToCart: (productId: string, quantity: number, optionId?: string) => void;
+  removeFromCart: (productId: string, optionId?: string) => void;
+  updateQuantity: (productId: string, delta: number, optionId?: string) => void;
+  toggleFavorite: (productId: string) => void;
+  placeOrder: () => void;
+  clearCart: () => void;
+  getCartTotal: () => number;
+  getProduct: (id: string) => Product | undefined;
+  
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  removeToast: (id: number) => void;
+
+  // Admin Actions
+  fetchData: () => Promise<void>;
+  createProduct: (product: Partial<Product>) => Promise<void>;
+  updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  createCategory: (name: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  getStats: () => Promise<Statistics | null>;
+}
+
+const StoreContext = createContext<StoreContextType | undefined>(undefined);
+
+export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Initialize with Mocks to ensure offline functionality or if backend is missing
+  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  const [categories, setCategories] = useState<Category[]>(
+    MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name }))
+  );
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('favorites');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const [history, setHistory] = useState<Order[]>(() => {
+    try {
+      const saved = localStorage.getItem('history');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Haptic feedback helper
+  const vibrate = (pattern: number | number[] = 10) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(pattern);
+    }
+  };
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [prods, cats] = await Promise.all([
+        api.get<Product[]>('/products').catch(() => MOCK_PRODUCTS),
+        api.get<Category[]>('/categories').catch(() => MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })))
+      ]);
+      setProducts(prods);
+      setCategories(cats);
+    } catch (e) {
+      console.warn("Failed to load initial data", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(cart));
+  }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  useEffect(() => {
+    localStorage.setItem('history', JSON.stringify(history));
+  }, [history]);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => removeToast(id), 3000);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  const getProduct = (id: string) => products.find(p => p.id === id);
+
+  const addToCart = (productId: string, quantity: number, optionId?: string) => {
+    vibrate(15);
+    setCart(prev => {
+      const existingIndex = prev.findIndex(item => item.productId === productId && item.selectedOptionId === optionId);
+      if (existingIndex >= 0) {
+        const newCart = [...prev];
+        newCart[existingIndex].quantity += quantity;
+        return newCart;
+      }
+      return [...prev, { productId, quantity, selectedOptionId: optionId }];
+    });
+    showToast('Товар добавлен в корзину');
+  };
+
+  const removeFromCart = (productId: string, optionId?: string) => {
+    vibrate(10);
+    setCart(prev => prev.filter(item => !(item.productId === productId && item.selectedOptionId === optionId)));
+  };
+
+  const updateQuantity = (productId: string, delta: number, optionId?: string) => {
+    vibrate(5);
+    setCart(prev => {
+      return prev.map(item => {
+        if (item.productId === productId && item.selectedOptionId === optionId) {
+          const newQty = item.quantity + delta;
+          return newQty > 0 ? { ...item, quantity: newQty } : item;
+        }
+        return item;
+      });
+    });
+  };
+
+  const toggleFavorite = (productId: string) => {
+    vibrate(10);
+    const isAdding = !favorites.includes(productId);
+    setFavorites(prev => 
+      isAdding ? [...prev, productId] : prev.filter(id => id !== productId)
+    );
+    if (isAdding) showToast('Добавлено в избранное');
+  };
+
+  const getCartTotal = () => {
+    return cart.reduce((sum, item) => {
+      const product = getProduct(item.productId);
+      if (!product) return sum;
+      let price = product.price;
+      if (item.selectedOptionId) {
+        const opt = product.options?.find(o => o.id === item.selectedOptionId);
+        if (opt) price += opt.priceModifier;
+      }
+      return sum + (price * item.quantity);
+    }, 0);
+  };
+
+  const placeOrder = async () => {
+    vibrate([50, 50, 50]);
+    const total = getCartTotal();
+    
+    // Prepare order payload
+    const orderItems = cart.map(item => {
+      const product = getProduct(item.productId);
+      const option = product?.options?.find(o => o.id === item.selectedOptionId);
+      return {
+        name: product?.name || 'Unknown',
+        quantity: item.quantity,
+        optionName: option?.name
+      };
+    });
+
+    // 1. Optimistic UI Update (Offline First approach)
+    const optimisticOrder: Order = {
+      id: "loc-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
+      date: new Date().toLocaleString('ru-RU'),
+      total,
+      items: orderItems
+    };
+    
+    setHistory(prev => [optimisticOrder, ...prev]);
+    // Clear cart immediately for better UX
+    setCart([]);
+
+    // 2. Send to Backend
+    try {
+      await api.post('/orders', {
+        total: total,
+        items: orderItems
+      });
+      showToast('Заказ успешно отправлен на кухню!', 'success');
+    } catch (error) {
+      console.warn('Backend unreachable, using offline mode:', error);
+      showToast('Нет связи. Заказ сохранен локально.', 'info');
+    }
+  };
+
+  const clearCart = () => setCart([]);
+
+  // --- Admin Functions ---
+
+  const createProduct = async (product: Partial<Product>) => {
+    try {
+      await api.post('/products', product);
+      await fetchData();
+      showToast('Продукт создан');
+    } catch (e) {
+      showToast('Ошибка создания продукта', 'error');
+    }
+  };
+
+  const updateProduct = async (id: string, product: Partial<Product>) => {
+    try {
+      await api.put(`/products/${id}`, product);
+      await fetchData();
+      showToast('Продукт обновлен');
+    } catch (e) {
+      showToast('Ошибка обновления продукта', 'error');
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    if (!window.confirm("Удалить этот продукт?")) return;
+    try {
+      await api.delete(`/products/${id}`);
+      await fetchData();
+      showToast('Продукт удален', 'info');
+    } catch (e) {
+      showToast('Ошибка удаления продукта', 'error');
+    }
+  };
+
+  const createCategory = async (name: string) => {
+    try {
+      await api.post('/categories', { name });
+      await fetchData();
+      showToast('Категория создана');
+    } catch (e) {
+      showToast('Ошибка создания категории', 'error');
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    if (!window.confirm("Удалить категорию?")) return;
+    try {
+      await api.delete(`/categories/${id}`);
+      await fetchData();
+      showToast('Категория удалена');
+    } catch (e) {
+      showToast('Ошибка удаления категории', 'error');
+    }
+  };
+
+  const getStats = async () => {
+    try {
+      return await api.get<Statistics>('/stats');
+    } catch {
+      return null;
+    }
+  };
+
+  return (
+    <StoreContext.Provider value={{
+      cart, favorites, history, toasts, addToCart, removeFromCart, updateQuantity, toggleFavorite, placeOrder, clearCart, getCartTotal, getProduct, showToast, removeToast,
+      products, categories, isLoading, fetchData, createProduct, updateProduct, deleteProduct, createCategory, deleteCategory, getStats
+    }}>
+      {children}
+    </StoreContext.Provider>
+  );
+};
+
+export const useStore = () => {
+  const context = useContext(StoreContext);
+  if (!context) throw new Error("useStore must be used within StoreProvider");
+  return context;
+};
