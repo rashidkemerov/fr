@@ -53,26 +53,33 @@ const AppContent = () => {
   };
 
   const themeStyles = {
-    backgroundColor: theme === 'dark' ? '#3b445b' : '#ffffff',
+    backgroundColor: theme === 'dark' ? '#0F172A' : '#F8FAFC',
     color: theme === 'dark' ? '#f8fafc' : '#0F172A',
     minHeight: '100vh',
-    transition: 'background-color 0.3s, color 0.3s'
+    transition: 'background-color 150ms cubic-bezier(0.2, 0.8, 0.2, 1), color 150ms cubic-bezier(0.2, 0.8, 0.2, 1)'
   };
 
   return (
-    <div style={themeStyles} className={getFontSizeClass()}>
-      <Suspense fallback={<LoadingScreen />}>
-        <Routes>
-          <Route path="/" element={<Catalog />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/history" element={<History />} />
-          {/* Admin Route */}
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-      <ToastContainer />
+    <div style={themeStyles} className={`relative overflow-hidden ${getFontSizeClass()}`}>
+      {/* Background Orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className={`absolute -top-20 -left-20 w-96 h-96 rounded-full blur-[100px] opacity-20 animate-pulse ${theme === 'dark' ? 'bg-orange-600' : 'bg-orange-300'}`}></div>
+        <div className={`absolute top-40 -right-20 w-72 h-72 rounded-full blur-[80px] opacity-10 animate-bounce ${theme === 'dark' ? 'bg-blue-600' : 'bg-blue-300'}`}></div>
+      </div>
+      
+      <div className="relative z-10">
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route path="/" element={<Catalog />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+        <ToastContainer />
+      </div>
     </div>
   );
 };
