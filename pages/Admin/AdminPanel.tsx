@@ -506,6 +506,26 @@ const EditProductModal = ({ product, categories, onClose, onSave }: any) => {
               required 
             />
           </div>
+
+           <div>
+            <label className="text-xs font-bold text-gray-400 uppercase">Фото (URL)</label>
+            <input 
+              value={localProduct.image} 
+              onChange={e => setLocalProduct({...localProduct, image: e.target.value})}
+              className="w-full p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100" 
+              placeholder="https://..."
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase">Описание</label>
+            <textarea 
+              value={localProduct.description} 
+              onChange={e => setLocalProduct({...localProduct, description: e.target.value})}
+              className="w-full p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100 min-h-[80px]" 
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
              <div>
               <label className="text-xs font-bold text-gray-400 uppercase">Цена</label>

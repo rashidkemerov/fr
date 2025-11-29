@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
   <head>
@@ -43,6 +44,10 @@
         background-color: #F8FAFC;
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
+        /* Safe area handling for Foldable/Curved screens */
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+        padding-bottom: env(safe-area-inset-bottom);
       }
       html { scroll-behavior: smooth; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -57,6 +62,18 @@
         background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
         background-size: 200% 100%;
         animation: loading 1.5s infinite;
+      }
+      /* Performance: Skip rendering off-screen content */
+      .content-auto {
+        content-visibility: auto;
+        contain-intrinsic-size: 1px 1000px; /* Estimated height of a category block */
+      }
+      /* Dual Screen Support (Surface Duo, Galaxy Fold) */
+      @media (horizontal-viewport-segments: 2) {
+        body {
+           display: flex;
+           flex-direction: row;
+        }
       }
       @keyframes loading {
         0% { background-position: 200% 0; }

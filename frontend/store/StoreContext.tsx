@@ -102,8 +102,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       console.error("Failed to load initial data", e);
       // Fallback to offline logic
       try {
-        const res = await fetch('/products.json');
-        if (!res.ok) throw new Error("No static JSON");
+        const res = await fetch('/transit.json'); // Try loading transit.json first
+        if (!res.ok) throw new Error("No transit JSON");
         const jsonProds = await res.json();
         setProducts(jsonProds);
         setCategories(MOCK_CATEGORIES.map((name, i) => ({ id: `cat-${i}`, name })));

@@ -10,14 +10,12 @@ const ProductDetail: React.FC = () => {
   const navigate = useNavigate();
   const { getProduct, addToCart, favorites, toggleFavorite, getCartTotal, cart, products } = useStore();
   
-  // State
   const [quantity, setQuantity] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string | undefined>(undefined);
   const [isAnimating, setIsAnimating] = useState(false);
   
   const product = getProduct(id || '');
 
-  // Navigation Logic (Find prev/next in same category)
   const categoryProducts = useMemo(() => {
     if (!product) return [];
     return products.filter(p => p.category === product.category);
@@ -27,7 +25,6 @@ const ProductDetail: React.FC = () => {
   const prevProduct = currentIndex > 0 ? categoryProducts[currentIndex - 1] : null;
   const nextProduct = currentIndex < categoryProducts.length - 1 ? categoryProducts[currentIndex + 1] : null;
 
-  // Use Custom Hook for Gestures
   const { handleTouchStart, handleTouchMove, handleTouchEnd, direction, setDirection } = useSwipeNavigation({
     onSwipeLeft: () => {
       if (nextProduct) {
@@ -44,7 +41,6 @@ const ProductDetail: React.FC = () => {
     }
   });
 
-  // Reset state on product change
   useEffect(() => {
     if (product?.options && product.options.length > 0) {
       setSelectedOption(product.options[0].id);
@@ -57,7 +53,6 @@ const ProductDetail: React.FC = () => {
 
   const isFav = favorites.includes(product.id);
   
-  // Calculate price
   const currentPrice = product.price + (selectedOption 
     ? (product.options?.find(o => o.id === selectedOption)?.priceModifier || 0) 
     : 0);
@@ -87,13 +82,11 @@ const ProductDetail: React.FC = () => {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Top Nav (Absolute) - High Z-Index for clickable buttons */}
       <div className="absolute top-0 left-0 w-full p-4 flex justify-between z-40 pointer-events-none">
         <div className="pointer-events-auto" onClick={(e) => e.stopPropagation()}>
            <BackButton onClick={handleClose} className="bg-white/80 backdrop-blur-md" />
         </div>
         
-        {/* Swipe Down Hint */}
         <div className="absolute left-1/2 -translate-x-1/2 top-2 opacity-50 animate-bounce pointer-events-none">
            <div className="w-12 h-1 bg-white/50 rounded-full shadow-sm"></div>
         </div>
@@ -110,7 +103,6 @@ const ProductDetail: React.FC = () => {
         </button>
       </div>
 
-      {/* Immersive Image Area with Transition Key */}
       <div key={product.id} className={`relative w-full h-[50vh] bg-slate-100 overflow-hidden`}>
         <div className={`w-full h-full ${direction === 'left' ? 'animate-fade-in' : direction === 'right' ? 'animate-fade-in' : ''}`}>
           <img 
@@ -124,13 +116,10 @@ const ProductDetail: React.FC = () => {
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white to-transparent" />
       </div>
 
-      {/* Content Sheet */}
       <div key={`content-${product.id}`} className="flex-1 bg-white -mt-10 rounded-t-[2.5rem] relative z-20 px-6 pb-36 animate-slide-up shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-        {/* Drag Handle Indicator */}
         <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mt-4 mb-4" />
 
         <div className="flex flex-col gap-2 mb-4">
-           {/* Tags Row */}
            {product.tags && product.tags.length > 0 && (
              <div className="flex gap-2">
                {product.tags.includes('hit') && (
@@ -161,7 +150,6 @@ const ProductDetail: React.FC = () => {
            </h1>
         </div>
 
-        {/* Price & Weight */}
         <div className="flex items-baseline gap-3 mb-6">
            <span className="text-3xl font-black text-accent">
              {currentPrice}₽
@@ -173,12 +161,10 @@ const ProductDetail: React.FC = () => {
            )}
         </div>
 
-        {/* Description */}
         <p className="text-gray-500 font-medium leading-relaxed mb-6 text-sm">
           {product.description}
         </p>
 
-        {/* Ingredients/Details */}
         <div className="bg-slate-50 rounded-2xl p-4 mb-8 border border-slate-100">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Состав</h3>
           <div className="space-y-2 text-sm font-semibold text-primary/80">
@@ -191,7 +177,6 @@ const ProductDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Options */}
         {product.options && (
           <div className="mb-8">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Опции</h3>
@@ -200,7 +185,7 @@ const ProductDetail: React.FC = () => {
                 <button
                   key={opt.id}
                   onClick={(e) => { e.stopPropagation(); setSelectedOption(opt.id); }}
-                  className={`py-3 px-4 rounded-xl text-sm font-bold transition-all border-2 ${
+                  className={`py-3 px-4 rounded-2xl text-sm font-bold transition-all border-2 ${
                     selectedOption === opt.id 
                       ? 'border-accent text-accent bg-orange-50' 
                       : 'border-transparent bg-slate-100 text-gray-500'
@@ -217,10 +202,8 @@ const ProductDetail: React.FC = () => {
         )}
       </div>
 
-      {/* Floating Action Bar */}
       <div className="fixed bottom-0 left-0 w-full p-4 z-50 glass-panel border-t-0" onClick={(e) => e.stopPropagation()}>
          <div className="flex items-center gap-4">
-            {/* Stepper */}
             <div className="flex items-center gap-4 bg-slate-100 rounded-2xl px-2 h-16 w-36 justify-between">
                 <button 
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -238,7 +221,6 @@ const ProductDetail: React.FC = () => {
                 </button>
             </div>
 
-            {/* Add Button */}
             <button 
               onClick={handleAddToCart}
               className={`flex-1 h-16 bg-primary text-white rounded-2xl shadow-lg shadow-primary/30 flex flex-col items-center justify-center transition-transform ${isAnimating ? 'scale-95' : 'active:scale-95'}`}
@@ -248,7 +230,6 @@ const ProductDetail: React.FC = () => {
             </button>
          </div>
          
-         {/* Mini Cart Status (Only if items exist elsewhere) */}
          {totalCartItems > 0 && (
            <div className="mt-2 text-center">
              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
