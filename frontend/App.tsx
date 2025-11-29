@@ -56,15 +56,14 @@ const AppContent = () => {
     backgroundColor: theme === 'dark' ? '#0F172A' : '#F8FAFC',
     color: theme === 'dark' ? '#f8fafc' : '#0F172A',
     minHeight: '100vh',
-    transition: 'background-color 150ms cubic-bezier(0.2, 0.8, 0.2, 1), color 150ms cubic-bezier(0.2, 0.8, 0.2, 1)'
   };
 
   return (
     <div style={themeStyles} className={`relative overflow-hidden ${getFontSizeClass()}`}>
-      {/* Background Orbs */}
+      {/* Background Orbs - Static and Lower Blur for Performance */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className={`absolute -top-20 -left-20 w-96 h-96 rounded-full blur-[100px] opacity-20 animate-pulse ${theme === 'dark' ? 'bg-orange-600' : 'bg-orange-300'}`}></div>
-        <div className={`absolute top-40 -right-20 w-72 h-72 rounded-full blur-[80px] opacity-10 animate-bounce ${theme === 'dark' ? 'bg-blue-600' : 'bg-blue-300'}`}></div>
+        <div className={`absolute -top-20 -left-20 w-80 h-80 rounded-full blur-[60px] opacity-15 ${theme === 'dark' ? 'bg-orange-600' : 'bg-orange-300'}`}></div>
+        <div className={`absolute top-40 -right-20 w-64 h-64 rounded-full blur-[50px] opacity-10 ${theme === 'dark' ? 'bg-blue-600' : 'bg-blue-300'}`}></div>
       </div>
       
       <div className="relative z-10">
